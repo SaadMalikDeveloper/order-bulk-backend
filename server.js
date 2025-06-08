@@ -3,10 +3,11 @@ const axios = require("axios");
 const cors = require("cors");
 
 const app = express();
-const PORT = 5000;
+const PORT = 4000;
 
-const API_TOKEN = "6avn43sdngehh0rh0cegbvpkxga9j0r";
-const BASE_URL = "https://api.bigcommerce.com/stores/rtw9pdfcir/v3/catalog";
+const API_TOKEN = "oqcoyjkikh8uyoczab4lsdksen36psp";
+const API_AUTH_CLIENT = "cpy17xvjru37a8v9y903r4lqws6awx0";
+const BASE_URL = "https://api.bigcommerce.com/stores/afh0vnr9h0/v3/catalog";
 
 const headers = {
   "X-Auth-Token": API_TOKEN,
@@ -81,6 +82,41 @@ app.get("/api/products/:id/variants", async (req, res) => {
   }
 });
 
+/**
+ * Route 3: Create a Cart (with selected items)
+ */
+app.use(express.json()); // Ensure body parser is enabled for JSON
+
+app.post("/api/create-cart", async (req, res) => {
+  try {
+    const response = await axios.post(
+      "https://api.bigcommerce.com/stores/afh0vnr9h0/v3/carts",
+      {
+        line_items: req.body.line_items,
+        channel_id: 1,
+      },
+      { headers }
+    );
+
+    const cart = response.data?.data;
+    let redirect_url = cart.redirect_url;
+
+    // Fallback redirect_url
+    if (!redirect_url && cart?.id) {
+      redirect_url = `https://store-afh0vnr9h0.mybigcommerce.com/cart.php?action=load&id=${cart.id}`;
+    }
+
+    res.json({
+      ...response.data,
+      redirect_url,
+    });
+    console.log(redirect_url);
+  } catch (err) {
+    console.error("Cart creation error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to create cart" });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at on render`);
 });
