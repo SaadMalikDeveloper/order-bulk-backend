@@ -1,0 +1,183 @@
+<h3>Bulk Order Grid</h3>
+<div id="variant-grid-root" data-product-id="{{ product.id }}"></div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", async () => {
+    const root = document.getElementById("variant-grid-root");
+    const productId = root?.dataset.productId;
+
+    if (!productId) return;
+
+    // Step 1: Fetch variants
+    let variants = [];
+    try {
+      // const res = await fetch(`http://localhost:4000/api/products/${productId}/variants`);
+      const res = await fetch(
+        `https://order-bulk-backend.onrender.com/api/products/${productId}/variants`
+      );
+      const data = await res.json();
+      variants = data.variants;
+    } catch (error) {
+      root.innerHTML = "<p style='color:red;'>Failed to load variants.</p>";
+      return;
+    }
+
+    // Step 2: Organize variants into a Color x Size grid
+    const gridData = {};
+    const sizeSet = new Set();
+
+    variants.forEach((variant) => {
+      const color = variant.option_values.find(
+        (opt) => opt.option_display_name === "Color"
+      )?.label;
+      const size = variant.option_values.find(
+        (opt) => opt.option_display_name === "Size"
+      )?.label;
+
+      if (color && size) {
+        sizeSet.add(size);
+        if (!gridData[color]) gridData[color] = {};
+        gridData[color][size] = {
+          id: variant.id,
+          sku: variant.sku,
+          inventory: variant.inventory_level,
+          price: variant.calculated_price / 100,
+          product_id: variant.product_id,
+        };
+      }
+    });
+    function getSwatchColor(colorLabel) {
+      for (const variant of variants) {
+        const colorOpt = variant.option_values.find(
+          (opt) => opt.option_display_name === "Color"
+        );
+        if (colorOpt?.label === colorLabel && colorOpt.color) {
+          return colorOpt.color;
+        }
+      }
+      return "#ccc"; // fallback color
+    }
+    const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
+    const allSizes = Array.from(sizeSet).sort((a, b) => {
+      const indexA = sizeOrder.indexOf(a);
+      const indexB = sizeOrder.indexOf(b);
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+
+    // Step 3: Render the grid
+    const quantities = {};
+
+    const table = document.createElement("table");
+    table.style.borderCollapse = "collapse";
+    table.style.width = "100%";
+    table.style.marginTop = "20px";
+    table.innerHTML = `
+    <thead>
+      <tr style="background:#000">
+        <th style="padding: 5px; border: 1px solid #fff;color:#fff;width:250px">COLOR </th>
+        ${allSizes
+          .map(
+            (size) =>
+              `<th style="padding: 5px; border: 1px solid #fff;color:#fff">${size}</th>`
+          )
+          .join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${Object.entries(gridData)
+        .map(
+          ([color, sizeData]) => `
+        <tr>
+          <td style="padding: 5px;  border: 1px solid #ccc;width:250px">
+            <div style="width: 20px; height: 20px; border-radius: 50%; border: 1px solid #ccc; background-color: ${getSwatchColor(
+              color
+            )};"></div>
+            <strong>${color}</strong>
+          </td>
+          ${allSizes
+            .map((size) => {
+              const entry = sizeData[size];
+              if (!entry)
+                return `<td style="padding: 5px;border:1px solid #ccc;text-align: center;">-</td>`;
+              return `
+              <td style="padding:5px 5px 0px 5px; border: 1px solid #ccc">
+                <!--<div><strong>ID:</strong> ${entry.id}</div>
+                <div><strong>SKU:</strong> ${entry.sku}</div>-->
+                <div class="input-invent-count"><input type="number" data-id="${entry.id}" min="0"  placeholder="Qty" style="width:150px;border: none;font-size: 12px;text-align: center;outline: none !important;"/></div>
+                <div class="input-inventory-details" style="text-align: right;font-size: 12px;color: #ccc;line-height: 1;">${entry.inventory} Avail</div>
+              </td>
+            `;
+            })
+            .join("")}
+        </tr>
+      `
+        )
+        .join("")}
+    </tbody>
+  `;
+
+    // Step 4: Add button
+    const button = document.createElement("button");
+    button.innerText = "Add to Cart";
+    button.style =
+      "margin-top: 20px; padding: 10px 20px;background-color: #444;border-color: #444;color: #fff; cursor: pointer;border-radius: 5px;float: right; ";
+    button.addEventListener("click", async () => {
+      const inputs = table.querySelectorAll("input[type='number']");
+      const lineItems = [];
+
+      inputs.forEach((input) => {
+        const qty = parseInt(input.value);
+        if (qty > 0) {
+          const variantId = parseInt(input.dataset.id);
+          const variant = variants.find((v) => v.id === variantId);
+          if (variant && variant.sku) {
+            lineItems.push({ sku: variant.sku, qty });
+          }
+        }
+      });
+
+      if (lineItems.length === 0) {
+        alert("No quantities selected.");
+        return;
+      }
+
+      // Sequentially add each item using async/await
+      for (const item of lineItems) {
+        console.log("Adding:", item.sku, item.qty);
+
+        try {
+          await $.ajax({
+            type: "POST",
+            url: "/cart.php",
+            data: {
+              action: "add",
+              sku: item.sku,
+              qty: item.qty,
+            },
+            contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+          });
+
+          console.log(`Added ${item.sku} to cart`);
+          await sleep(300); // optional pause between calls
+        } catch (err) {
+          console.error(`Failed to add ${item.sku}`, err.responseText);
+        }
+      }
+
+      alert("All selected items added to cart!");
+    });
+
+    // Sleep helper
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    // Final DOM injection
+    root.innerHTML = "";
+    root.appendChild(table);
+    root.appendChild(button);
+  });
+</script>
