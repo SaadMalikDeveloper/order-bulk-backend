@@ -61,17 +61,50 @@ app.get("/api/products/:id/variants", async (req, res) => {
   const productId = req.params.id;
 
   try {
-    const response = await axios.get(
-      `${BASE_URL}/products/${productId}/variants`,
-      {
-        headers,
-      }
+    // Step 1: Fetch product options (to get color data)
+    const optionsRes = await axios.get(
+      `${BASE_URL}/products/${productId}/options`,
+      { headers }
     );
+
+    const optionValuesMap = {};
+
+    // Build a map of option_value_id -> color hex
+    optionsRes.data.data.forEach((option) => {
+      option.option_values.forEach((value) => {
+        if (value.value_data?.colors?.length) {
+          optionValuesMap[value.id] = {
+            label: value.label,
+            color: value.value_data.colors[0],
+          };
+        }
+      });
+    });
+
+    // Step 2: Fetch variants
+    const variantsRes = await axios.get(
+      `${BASE_URL}/products/${productId}/variants`,
+      { headers }
+    );
+
+    const variantsWithColor = variantsRes.data.data.map((variant) => {
+      const optionValuesWithColors = variant.option_values.map((ov) => {
+        return {
+          ...ov,
+          color: optionValuesMap[ov.id]?.color || null,
+        };
+      });
+
+      return {
+        ...variant,
+        option_values: optionValuesWithColors,
+      };
+    });
 
     res.json({
       product_id: productId,
-      total: response.data.data.length,
-      variants: response.data.data,
+      total: variantsWithColor.length,
+      variants: variantsWithColor,
     });
   } catch (err) {
     console.error(
