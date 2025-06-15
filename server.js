@@ -221,7 +221,7 @@ app.get("/api/products/:id/variants-with-inventory", async (req, res) => {
 
     // Step 2: Fetch variants
     const variantsRes = await axios.get(
-      `${BASE_URL}/products/${productId}/variants`,
+      `${BASE_URL}/products/${productId}/variants?page=1&limit=250`,
       { headers }
     );
     const variants = variantsRes.data.data;
