@@ -150,9 +150,7 @@ app.post("/api/create-cart", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at on render`);
-});
+
 
 app.get("/api/warehouse-items", async (req, res) => {
   try {
@@ -189,9 +187,7 @@ app.get("/api/warehouse-items", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("Server listening on port 3000");
-});
+
 
 /*
  *  code for the variant with inventory
