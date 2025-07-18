@@ -290,6 +290,6 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
 });
 const serverless = require("serverless-http");
 module.exports = serverless(app);
-// app.listen(PORT, () => {
-//   console.log(`Server is running on http://localhost:${PORT}`);
-// });
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
