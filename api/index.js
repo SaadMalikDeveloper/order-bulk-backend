@@ -20,7 +20,7 @@ app.use(cors());
 /**
  * Route 1: Get All Products (no variants)
  */
-app.get("/api/products", async (req, res) => {
+app.get("/products", async (req, res) => {
   let allProducts = [];
   let page = 1;
   const limit = 50;
@@ -57,7 +57,7 @@ app.get("/api/products", async (req, res) => {
 /**
  * Route 2: Get Variants for a Specific Product
  */
-app.get("/api/products/:id/variants", async (req, res) => {
+app.get("/products/:id/variants", async (req, res) => {
   const productId = req.params.id;
 
   try {
@@ -150,7 +150,7 @@ app.post("/api/create-cart", async (req, res) => {
   }
 });
 
-app.get("/api/warehouse-items", async (req, res) => {
+app.get("/warehouse-items", async (req, res) => {
   try {
     // Step 1: Fetch all warehouse locations
     const locationsRes = await axios.get(
@@ -189,7 +189,7 @@ app.get("/api/warehouse-items", async (req, res) => {
  *  code for the variant with inventory
  */
 
-app.get("/api/products/:id/variants-with-inventory", async (req, res) => {
+app.get("/products/:id/variants-with-inventory", async (req, res) => {
   const productId = req.params.id;
 
   try {
