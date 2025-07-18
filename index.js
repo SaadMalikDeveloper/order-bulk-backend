@@ -150,8 +150,6 @@ app.post("/api/create-cart", async (req, res) => {
   }
 });
 
-
-
 app.get("/api/warehouse-items", async (req, res) => {
   try {
     // Step 1: Fetch all warehouse locations
@@ -186,8 +184,6 @@ app.get("/api/warehouse-items", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch warehouse items" });
   }
 });
-
-
 
 /*
  *  code for the variant with inventory
@@ -287,3 +283,5 @@ app.get("/api/products/:id/variants-with-inventory", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch combined data" });
   }
 });
+const serverless = require("serverless-http");
+module.exports.handler = serverless(app);
