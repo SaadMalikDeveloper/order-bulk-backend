@@ -20,6 +20,11 @@ app.use(cors());
 /**
  * Route 1: Get All Products (no variants)
  */
+app.get("/test", async (req, res) => {
+  res.json({
+    status: "all ok",
+  });
+});
 app.get("/products", async (req, res) => {
   let allProducts = [];
   let page = 1;
