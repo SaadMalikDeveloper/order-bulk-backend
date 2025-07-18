@@ -284,4 +284,4 @@ app.get("/api/products/:id/variants-with-inventory", async (req, res) => {
   }
 });
 const serverless = require("serverless-http");
-module.exports.handler = serverless(app);
+module.exports = serverless(app);
