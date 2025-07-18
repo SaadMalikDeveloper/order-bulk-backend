@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "./index.js",
+      "src": "index.js",
       "use": "@vercel/node"
     }
   ],
@@ -11,11 +11,5 @@
       "src": "/(.*)",
       "dest": "/index.js"
     }
-  ],
-  "functions": {
-    "index": {
-      "maxDuration": 50,
-      "maxLambdaSize": "50mb"
-    }
-  }
+  ]
 }
