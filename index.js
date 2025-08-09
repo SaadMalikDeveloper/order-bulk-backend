@@ -239,8 +239,6 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
       const items = itemsRes.data.data;
 
       items.forEach((item) => {
-        // console.log("item>>>>>>>>>>>", item);
-        // console.log("available_to_sell>>>>>>>>>>>", item.available_to_sell);
         warehouseItems.push({
           warehouse_id: location.id,
           warehouse_label: location.label,
@@ -251,14 +249,27 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
       });
     }
 
-    // Step 4: Merge inventory into each variant
+    // ✅ Step 4: Fetch price list records
+    const priceListRes = await axios.get(
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/2/records?page=1&limit=2000`,
+      { headers }
+    );
+    const priceListRecords = priceListRes.data.data;
+
+    // Create a map of variant_id => calculated_price
+    const priceMap = {};
+    priceListRecords.forEach((record) => {
+      priceMap[record.variant_id] = record.calculated_price;
+    });
+
+    // Step 5: Merge inventory and price into each variant
     const enrichedVariants = variants.map((variant) => {
       const optionValuesWithColors = variant.option_values.map((ov) => ({
         ...ov,
         label: optionValuesMap[ov.id]?.label || ov.label,
         color: optionValuesMap[ov.id]?.color || null,
       }));
-      // console.log(warehouseItems);
+
       const inventory_by_warehouse = warehouseItems
         .filter((item) => item.variant_id === variant.id)
         .map((item) => ({
@@ -268,10 +279,13 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
           sku_inventory: item.sku_inventory,
         }));
 
+      const calculated_price = priceMap[variant.id] || null;
+
       return {
         ...variant,
         option_values: optionValuesWithColors,
         inventory_by_warehouse,
+        calculated_price, // ✅ added
       };
     });
 
@@ -282,12 +296,13 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
     });
   } catch (err) {
     console.error(
-      `Error fetching combined variant and inventory data for product ${productId}:`,
+      `Error fetching combined variant, inventory, and price data for product ${productId}:`,
       err.response?.data || err.message
     );
     res.status(500).json({ error: "Failed to fetch combined data" });
   }
 });
+
 const serverless = require("serverless-http");
 module.exports = serverless(app);
 app.listen(PORT, () => {
