@@ -196,31 +196,9 @@ app.get("/warehouse-items", async (req, res) => {
 
 app.get("/products/:id/variants-with-inventory", async (req, res) => {
   const productId = req.params.id;
-  const customerId = req.query.customer_id;
-
-  console.log("============>", customerId);
 
   try {
-    const customerRes = await axios.get(
-      `https://api.bigcommerce.com/stores/afh0vnr9h0/v2/customers/${customerId}`,
-      { headers }
-    );
-
-    const customerIdURL = customerRes.data.customer_group_id;
-    console.log("customer data:", customerRes.data.customer_group_id);
-
-    const customerGroupId = await axios.get(
-      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/assignments?customer_group_id=${customerIdURL}`,
-      { headers }
-    );
-    const priceListIdRaw = customerGroupId.data.data[0]?.price_list_id;
-    const customerGroupIdPrice =
-      priceListIdRaw === undefined ? 1 : priceListIdRaw;
-
-    console.log("customerGroupIdPrice data:", customerGroupIdPrice);
-
     // Step 1: Fetch product options (to get color data)
-
     const optionsRes = await axios.get(
       `${BASE_URL}/products/${productId}/options`,
       { headers }
@@ -273,7 +251,7 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
 
     // ✅ Step 4: Fetch price list records
     const priceListRes = await axios.get(
-      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/${customerGroupIdPrice}/records?page=1&limit=2000`,
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/2/records?page=1&limit=2000`,
       { headers }
     );
     const priceListRecords = priceListRes.data.data;
@@ -301,20 +279,13 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
           sku_inventory: item.sku_inventory,
         }));
 
-      const calculated_price =
-        priceMap[variant.id] !== undefined
-          ? priceMap[variant.id]
-          : variant.calculated_price;
+      const calculated_price = priceMap[variant.id] || null;
 
-      const price = priceMap[variant.id] !== undefined ? variant.price : null;
-
-      console.log("variant price check", variant.price);
       return {
         ...variant,
         option_values: optionValuesWithColors,
         inventory_by_warehouse,
-        calculated_price,
-        price,
+        calculated_price, // ✅ added
       };
     });
 
@@ -337,3 +308,4 @@ module.exports = serverless(app);
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+//test
