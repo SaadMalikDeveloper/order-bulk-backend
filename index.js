@@ -196,6 +196,144 @@ app.get("/warehouse-items", async (req, res) => {
 
 app.get("/products/:id/variants-with-inventory", async (req, res) => {
   const productId = req.params.id;
+  const customerId = req.query.customer_id;
+
+  console.log("============>", customerId);
+
+  try {
+    const customerRes = await axios.get(
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v2/customers/${customerId}`,
+      { headers }
+    );
+
+    const customerIdURL = customerRes.data.customer_group_id;
+    console.log("customer data:", customerRes.data.customer_group_id);
+
+    const customerGroupId = await axios.get(
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/assignments?customer_group_id=${customerIdURL}`,
+      { headers }
+    );
+    const priceListIdRaw = customerGroupId.data.data[0]?.price_list_id;
+    const customerGroupIdPrice =
+      priceListIdRaw === undefined ? 1 : priceListIdRaw;
+
+    console.log("customerGroupIdPrice data:", customerGroupIdPrice);
+
+    // Step 1: Fetch product options (to get color data)
+
+    const optionsRes = await axios.get(
+      `${BASE_URL}/products/${productId}/options`,
+      { headers }
+    );
+
+    const optionValuesMap = {};
+    optionsRes.data.data.forEach((option) => {
+      option.option_values.forEach((value) => {
+        if (value.value_data?.colors?.length) {
+          optionValuesMap[value.id] = {
+            label: value.label,
+            color: value.value_data.colors[0],
+          };
+        }
+      });
+    });
+
+    // Step 2: Fetch variants
+    const variantsRes = await axios.get(
+      `${BASE_URL}/products/${productId}/variants?page=1&limit=250`,
+      { headers }
+    );
+    const variants = variantsRes.data.data;
+
+    // Step 3: Fetch all warehouse inventory data
+    const locationsRes = await axios.get(
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/inventory/locations`,
+      { headers }
+    );
+    const locations = locationsRes.data.data;
+
+    const warehouseItems = [];
+    for (const location of locations) {
+      const itemsRes = await axios.get(
+        `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/inventory/locations/${location.id}/items`,
+        { headers }
+      );
+      const items = itemsRes.data.data;
+
+      items.forEach((item) => {
+        warehouseItems.push({
+          warehouse_id: location.id,
+          warehouse_label: location.label,
+          variant_id: item.identity.variant_id,
+          stock_level: item.available_to_sell,
+          sku_inventory: item.identity.sku,
+        });
+      });
+    }
+
+    // ✅ Step 4: Fetch price list records
+    const priceListRes = await axios.get(
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/${customerGroupIdPrice}/records?page=1&limit=2000`,
+      { headers }
+    );
+    const priceListRecords = priceListRes.data.data;
+
+    // Create a map of variant_id => calculated_price
+    const priceMap = {};
+    priceListRecords.forEach((record) => {
+      priceMap[record.variant_id] = record.calculated_price;
+    });
+
+    // Step 5: Merge inventory and price into each variant
+    const enrichedVariants = variants.map((variant) => {
+      const optionValuesWithColors = variant.option_values.map((ov) => ({
+        ...ov,
+        label: optionValuesMap[ov.id]?.label || ov.label,
+        color: optionValuesMap[ov.id]?.color || null,
+      }));
+
+      const inventory_by_warehouse = warehouseItems
+        .filter((item) => item.variant_id === variant.id)
+        .map((item) => ({
+          warehouse_id: item.warehouse_id,
+          warehouse_label: item.warehouse_label,
+          stock_level: item.stock_level,
+          sku_inventory: item.sku_inventory,
+        }));
+
+      const calculated_price =
+        priceMap[variant.id] !== undefined
+          ? priceMap[variant.id]
+          : variant.calculated_price;
+
+      const price = priceMap[variant.id] !== undefined ? variant.price : null;
+
+      console.log("variant price check", variant.price);
+      return {
+        ...variant,
+        option_values: optionValuesWithColors,
+        inventory_by_warehouse,
+        calculated_price,
+        price,
+      };
+    });
+
+    res.json({
+      product_id: productId,
+      total: enrichedVariants.length,
+      variants: enrichedVariants,
+    });
+  } catch (err) {
+    console.error(
+      `Error fetching combined variant, inventory, and price data for product ${productId}:`,
+      err.response?.data || err.message
+    );
+    res.status(500).json({ error: "Failed to fetch combined data" });
+  }
+});
+
+app.get("/products/:id/variants-with-inventory-color", async (req, res) => {
+  const productId = req.params.id;
 
   try {
     // Step 1: Fetch product options (to get color data)
@@ -308,4 +446,3 @@ module.exports = serverless(app);
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
-//test
