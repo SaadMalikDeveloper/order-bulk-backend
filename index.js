@@ -270,21 +270,36 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
         });
       });
     }
-
-    // ✅ Step 4: Fetch price list records
+    // ✅ Step 4: Fetch price list records for the customer group
     const priceListRes = await axios.get(
       `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/${customerGroupIdPrice}/records?page=1&limit=2000`,
       { headers }
     );
     const priceListRecords = priceListRes.data.data;
 
-    // Create a map of variant_id => calculated_price
+    // Map: variant_id => calculated_price from customer-specific price list
     const priceMap = {};
     priceListRecords.forEach((record) => {
       priceMap[record.variant_id] = record.calculated_price;
     });
 
-    // Step 5: Merge inventory and price into each variant
+    // ✅ Step 4b: Fetch base price & sale price from pricelist 3
+    const basePriceListRes = await axios.get(
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/3/records?page=1&limit=2000`,
+      { headers }
+    );
+    const basePriceListRecords = basePriceListRes.data.data;
+
+    // Map: variant_id => { price, sale_price }
+    const basePriceMap = {};
+    basePriceListRecords.forEach((record) => {
+      basePriceMap[record.variant_id] = {
+        price: record.price ?? null,
+        sale_price: record.sale_price ?? null,
+      };
+    });
+
+    // Step 5: Merge everything into each variant
     const enrichedVariants = variants.map((variant) => {
       const optionValuesWithColors = variant.option_values.map((ov) => ({
         ...ov,
@@ -301,20 +316,13 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
           sku_inventory: item.sku_inventory,
         }));
 
-      const calculated_price =
-        priceMap[variant.id] !== undefined
-          ? priceMap[variant.id]
-          : variant.calculated_price;
-
-      const price = priceMap[variant.id] !== undefined ? variant.price : null;
-
-      console.log("variant price check", variant.price);
       return {
         ...variant,
         option_values: optionValuesWithColors,
         inventory_by_warehouse,
-        calculated_price,
-        price,
+        calculated_price: priceMap[variant.id] ?? variant.calculated_price,
+        price: basePriceMap[variant.id]?.price ?? null,
+        sale_price: basePriceMap[variant.id]?.sale_price ?? null,
       };
     });
 
