@@ -285,7 +285,7 @@ app.get("/products/:id/variants-with-inventory", async (req, res) => {
 
     // ✅ Step 4b: Fetch base price & sale price from pricelist 3
     const basePriceListRes = await axios.get(
-      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/3/records?page=1&limit=2000`,
+      `https://api.bigcommerce.com/stores/afh0vnr9h0/v3/pricelists/${customerGroupIdPrice}/records?page=1&limit=2000`,
       { headers }
     );
     const basePriceListRecords = basePriceListRes.data.data;
